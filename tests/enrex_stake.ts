@@ -87,11 +87,12 @@ describe("enrex_stake", () => {
   });
 
   it("Create Pool", async() => {
-    let pools = await program.account.farmPoolAccount.all()
-    let pool_index = pools.length;
     let apy = 48;
     let min_stake_amount = new BN(1000 * 10 ** 9);
     let lock_duration = new BN(30 * 24 * 3600);
+
+    let pools = await program.account.farmPoolAccount.all()
+    let pool_index = pools.length;
 
     [poolSigner] = await anchor.web3.PublicKey.findProgramAddress(
       [mintA.publicKey.toBuffer(), Buffer.from([pool_index])],

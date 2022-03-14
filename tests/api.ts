@@ -1,111 +1,196 @@
+import { IDL as idl, EnrexStake } from "../target/types/enrex_stake";
+let program: anchor.Program<EnrexStake> = null as any;
+let programId: anchor.web3.PublicKey = null as any;
+
 // @ts-ignore
 import * as anchor from '@project-serum/anchor';
+const { BN, web3, Program, Provider } = anchor
+import { Account, Connection, PublicKey, TokenAccountsFilter } from '@solana/web3.js';
 
 // @ts-ignore
-import * as serumCmn from "@project-serum/common";
+import { TOKEN_PROGRAM_ID, Token } from "@solana/spl-token";
 
-import { TOKEN_PROGRAM_ID, Token, } from "@solana/spl-token";
-const { BN, web3, Program, Provider } = anchor
-const { PublicKey, SystemProgram, Keypair, Transaction } = web3
-const utf8 = anchor.utils.bytes.utf8;
 
 const defaultAccounts = {
     tokenProgram: TOKEN_PROGRAM_ID,
     clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
-    systemProgram: SystemProgram.programId,
+    systemProgram: anchor.web3.SystemProgram.programId,
     rent: anchor.web3.SYSVAR_RENT_PUBKEY,
 }
 
-import idl_file from '../target/idl/enrex_stake.json';
-import { metadata as STAKE_PROJECT_PROGRAM_ID } from '../target/idl/enrex_stake.json';
-import { Account, Connection, TokenAccountsFilter } from '@solana/web3.js';
+export const STATE_TAG = Buffer.from("state");
+export const STAKE_INFO_TAG = Buffer.from("stake-info");
 
-export function getProgram (
-    connection: Connection,
-    wallet: any
-) {
-    const provider = new anchor.Provider(
-        connection,
-        wallet,
-        anchor.Provider.defaultOptions(),
-    );
-    // Generate the program client from IDL.
-    const program = new (anchor as any).Program(idl_file, new PublicKey(STAKE_PROJECT_PROGRAM_ID), provider);
-    return program;
+export interface IResult {
+    success: boolean;
+    data: any;
+    msg: string;
 }
 
-export async function getStateKey() {
-    const [stateKey] = await anchor.web3.PublicKey.findProgramAddress(
-        [utf8.encode('state')],
-        new PublicKey(STAKE_PROJECT_PROGRAM_ID)
-        );
+export async function getPda(
+  seeds: (Buffer | Uint8Array)[],
+  programId: anchor.web3.PublicKey
+) {
+  const [pdaKey] = await anchor.web3.PublicKey.findProgramAddress(
+    seeds,
+    programId
+  );
+  return pdaKey;
+}
+
+export const getLamport = (amount: number) : anchor.BN => {
+	return new BN(amount * 10 ** 9);
+}
+
+export async function createMint (provider, authority, decimals = 9) {
+  if (authority === undefined) {
+    authority = provider.wallet.publicKey;
+  }
+  const mint = await Token.createMint(
+    provider.connection,
+    provider.wallet.payer,
+    authority,
+    null,
+    decimals,
+    TOKEN_PROGRAM_ID
+  );
+  return mint;
+}
+
+export const initProgram = (
+	connection: anchor.web3.Connection,
+	wallet: any,
+	pid: PublicKey
+): IResult => {
+	let result: IResult = { success: true, data: null, msg: "" };
+	try {
+		programId = pid;
+		const provider = new anchor.Provider(
+      connection,
+      wallet,
+      anchor.Provider.defaultOptions()
+    );
+
+    // Generate the program client from IDL.
+    program = new (anchor as any).Program(
+      idl,
+      programId,
+      provider
+    ) as anchor.Program<EnrexStake>;
+
+		console.log('wallet has changed into', wallet.publicKey.toString())
+	} catch(e: any) {
+    result.success = false;
+    result.msg = e.message;
+	} finally {
+		return result;
+	}
+}
+
+export async function getStatePda() {
+    const stateKey = await getPda([STATE_TAG], programId);
     return stateKey
 }
 
-export async function getPoolSigner(
-    mint: string | anchor.web3.PublicKey,
+export async function getPoolPda(
+    mint: string | PublicKey,
     pool_index: number
 ) {
-    const [poolSigner] = await anchor.web3.PublicKey.findProgramAddress(
-        [(mint as anchor.web3.PublicKey).toBuffer(), Buffer.from([pool_index])],
-        new PublicKey(STAKE_PROJECT_PROGRAM_ID)
-      );
+    const poolSigner = await getPda([(new PublicKey(mint)).toBuffer(), Buffer.from([pool_index])], programId);
     return poolSigner;
 }
 
 export async function getPoolVault(
-    mint: anchor.web3.PublicKey,
-    pool_signer: anchor.web3.PublicKey
+    mint: string | anchor.web3.PublicKey,
+    pool_signer: string | anchor.web3.PublicKey
 ) {
-    const [poolVault] = await anchor.web3.PublicKey.findProgramAddress(
-        [mint.toBuffer(), pool_signer.toBuffer()],
-        new PublicKey(STAKE_PROJECT_PROGRAM_ID)
-      );
+    const poolVault = await getPda(
+			[new PublicKey(mint).toBuffer(), new PublicKey(pool_signer).toBuffer()],
+      programId
+    );
     return poolVault;
 }
 
-export async function createState(
-    connection: Connection,
-    wallet: any,
-    mint: string | anchor.web3.PublicKey
+export async function getNewStakeInfoAccountPda(
+	pool_pda: string | PublicKey
 ) {
-    const program = await getProgram(connection, wallet);
-    let stateSigner = await getStateKey();
+	let poolInfo = await program.account.farmPoolAccount.fetch(pool_pda);
+
+
+	const [stakeInfoPda] = await anchor.web3.PublicKey.findProgramAddress(
+		[
+			STAKE_INFO_TAG,
+			new PublicKey(pool_pda).toBuffer(),
+			program.provider.wallet.publicKey.toBuffer(),
+			poolInfo.incStakes.toBuffer("be", 8)
+		],
+		program.programId
+	);
+
+	console.log('incStakes', poolInfo.incStakes.toNumber())
+	console.log('stakedInfo', stakeInfoPda.toString())
+	return stakeInfoPda;
+}
+
+export async function getStakeInfoAccountPdaByIndex(
+	pool_pda: string | PublicKey,
+	stake_index: number
+) {
+	let poolInfo = await program.account.farmPoolAccount.fetch(pool_pda);
+
+
+	const [stakeInfoPda] = await anchor.web3.PublicKey.findProgramAddress(
+		[
+			STAKE_INFO_TAG,
+			new PublicKey(pool_pda).toBuffer(),
+			program.provider.wallet.publicKey.toBuffer(),
+			new BN(stake_index).toBuffer("be", 8)
+		],
+		program.programId
+	);
+
+	console.log('incStakes', poolInfo.incStakes.toNumber())
+	console.log('stakedInfo', stakeInfoPda.toString())
+	return stakeInfoPda;
+}
+
+
+export async function createState(
+    mint: string | PublicKey
+) {
+    let stateSigner = await getStatePda();
 
     await program.rpc.createState({
         accounts: {
           state: stateSigner,
           tokenMint: mint,
-          authority: wallet.publicKey,
+          authority: program.provider.wallet.publicKey,
           ...defaultAccounts
         }
       });
 }
 
 export async function createPool(
-    connection: Connection,
-    wallet: any,
     apy: number,
     min_stake_amount: number,
     lock_duration: anchor.BN,
-    mint: anchor.web3.PublicKey
+    mint: string | PublicKey
 ) {
-    const program = await getProgram(connection, wallet);
-    let stateSigner = await getStateKey();
+    let stateSigner = await getStatePda();
 
     let pools = await program.account.farmPoolAccount.all()
     let pool_index = pools.length;
-    let poolSigner = await getPoolSigner(mint, pool_index);
+    let poolSigner = await getPoolPda(mint, pool_index);
 
-    const [poolVault] = await anchor.web3.PublicKey.findProgramAddress(
-        [mint.toBuffer(), poolSigner.toBuffer()],
-        program.programId
-      );
+    const poolVault = await getPda(
+			[new PublicKey(mint).toBuffer(), poolSigner.toBuffer()],
+			programId
+		);
 
     await program.rpc.createPool(
         pool_index,
         apy,
-        new BN(min_stake_amount * 10 ** 9),
+        getLamport(min_stake_amount),
         lock_duration,
         {
             accounts:{
@@ -113,7 +198,7 @@ export async function createPool(
                 state: stateSigner,
                 vault: poolVault,
                 mint: mint,
-                authority: wallet,
+                authority: program.provider.wallet.publicKey,
                 ...defaultAccounts
             }
         }
@@ -121,32 +206,30 @@ export async function createPool(
 }
 
 export async function fundPool(
-    connection: Connection,
-    wallet: any,
     mint: anchor.web3.PublicKey,
     vault: anchor.web3.PublicKey,
     pool_index: number,
     amount: number
 ) {
-    const program = await getProgram(connection, wallet);
-    let stateSigner = await getStateKey();
-    let poolSigner = await getPoolSigner(mint, pool_index);
+    let stateSigner = await getStatePda();
+    let poolSigner = await getPoolPda(mint, pool_index);
     let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.fundPool(new BN(amount * 10 ** 9),
+    const tx = await program.transaction.fundPool(getLamport(amount),
     {
       accounts: {
         state: stateSigner,
         pool: poolSigner,
-        authority: wallet.publicKey,
+        authority: program.provider.wallet.publicKey,
         poolVault: poolVault,
         userVault: vault,
         ...defaultAccounts
       }
     });
+
     const user_provider = new anchor.Provider(
-      connection,
-      wallet,
+      program.provider.connection,
+      program.provider.wallet,
       { commitment: 'confirmed' }
     );
 
@@ -154,32 +237,29 @@ export async function fundPool(
 }
 
 export async function withdraw(
-    connection: Connection,
-    wallet: any,
     mint: anchor.web3.PublicKey,
     vault: anchor.web3.PublicKey,
     pool_index: number,
     amount: number
 ) {
-    const program = await getProgram(connection, wallet);
-    let stateSigner = await getStateKey();
-    let poolSigner = await getPoolSigner(mint, pool_index);
+    let stateSigner = await getStatePda();
+    let poolSigner = await getPoolPda(mint, pool_index);
     let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.withdrawPool(new BN(amount * 10 ** 9),
+    const tx = await program.transaction.withdrawPool(getLamport(amount),
     {
       accounts: {
         state: stateSigner,
         pool: poolSigner,
-        authority: wallet.publicKey,
+        authority: program.provider.wallet.publicKey,
         poolVault: poolVault,
         userVault: vault,
         ...defaultAccounts
       }
     });
     const user_provider = new anchor.Provider(
-      connection,
-      wallet,
+      program.provider.connection,
+      program.provider.wallet,
       { commitment: 'confirmed' }
     );
 
@@ -187,32 +267,30 @@ export async function withdraw(
 }
 
 export async function stake(
-    connection: Connection,
-    wallet: any,
     mint: anchor.web3.PublicKey,
     user_vault: anchor.web3.PublicKey,
     pool_index: number,
     amount
 ) {
-    const program = await getProgram(connection, wallet);
-    let stateSigner = await getStateKey();
-    let stakeInfo = await program.account.stateAccount.fetch(stateSigner);
-    let poolSigner = await getPoolSigner(mint, pool_index);
-    let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.stake(new BN(amount * 10 ** 9),
+    let stateSigner = await getStatePda();
+    let poolSigner = await getPoolPda(mint, pool_index);
+    let poolVault = await getPoolVault(mint, poolSigner);
+    let stakeInfo = await getNewStakeInfoAccountPda( poolSigner );
+
+    const tx = await program.transaction.stake(getLamport( amount ),
     {
       accounts: {
         stakedInfo: stakeInfo,
         state: stateSigner,
         pool: poolSigner,
-        authority: wallet.publicKey,
+        authority: program.provider.wallet.publicKey,
         poolVault: poolVault,
         userVault: user_vault,
         ...defaultAccounts
       }
     });
-    const user_provider = new anchor.Provider(connection, wallet, { commitment: 'confirmed' });
+    const user_provider = new anchor.Provider(program.provider.connection, program.provider.wallet, { commitment: 'confirmed' });
 
     const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
     // return await connection.getTransaction(hash);
@@ -220,16 +298,15 @@ export async function stake(
 
 
   export async function claim(
-    connection: Connection,
-    wallet: any,
     mint: anchor.web3.PublicKey,
     user_vault: anchor.web3.PublicKey,
-    pool_index: number
+    pool_index: number,
+		stake_index: number
   ) {
-    const program = await getProgram(connection, wallet);
-    let stateSigner = await getStateKey();
-    let stakeInfo = await program.account.stateAccount.fetch(stateSigner);
-    let poolSigner = await getPoolSigner(mint, pool_index);
+      //check if user_vault exists and create
+    let stateSigner = await getStatePda();
+    let poolSigner = await getPoolPda(mint, pool_index);
+    let stakeInfo = await getStakeInfoAccountPdaByIndex( poolSigner, stake_index );
     let poolVault = await getPoolVault(mint, poolSigner);
 
     const tx = await program.transaction.claimStake(
@@ -238,29 +315,32 @@ export async function stake(
         stakedInfo: stakeInfo,
         state: stateSigner,
         pool: poolSigner,
-        authority: wallet.publicKey,
+        authority: program.provider.wallet.publicKey,
         poolVault: poolVault,
         userVault: user_vault,
         ...defaultAccounts
       }
     });
-    const user_provider = new anchor.Provider(connection, wallet, { commitment: 'confirmed' });
+    const user_provider = new anchor.Provider(
+			program.provider.connection,
+			program.provider.wallet,
+			{ commitment: 'confirmed' }
+		);
 
     const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
   }
 
 
   export async function cancelStake(
-    connection: Connection,
-    wallet: any,
     mint: anchor.web3.PublicKey,
     user_vault: anchor.web3.PublicKey,
-    pool_index: number
+    pool_index: number,
+		stake_index: number
   ) {
-    const program = await getProgram(connection, wallet);
-    let stateSigner = await getStateKey();
-    let stakeInfo = await program.account.stateAccount.fetch(stateSigner);
-    let poolSigner = await getPoolSigner(mint, pool_index);
+
+    let stateSigner = await getStatePda();
+    let poolSigner = await getPoolPda(mint, pool_index);
+    let stakeInfo = await getStakeInfoAccountPdaByIndex( poolSigner, stake_index );
     let poolVault = await getPoolVault(mint, poolSigner);
 
     const tx = await program.transaction.cancelStake(
@@ -269,13 +349,18 @@ export async function stake(
         stakedInfo: stakeInfo,
         state: stateSigner,
         pool: poolSigner,
-        authority: wallet.publicKey,
+        authority: program.provider.wallet.publicKey,
         poolVault: poolVault,
         userVault: user_vault,
         ...defaultAccounts
       }
     });
-    const user_provider = new anchor.Provider(connection, wallet, { commitment: 'confirmed' });
+
+    const user_provider = new anchor.Provider(
+			program.provider.connection,
+			program.provider.wallet,
+			{ commitment: 'confirmed' }
+		);
 
     const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
   }

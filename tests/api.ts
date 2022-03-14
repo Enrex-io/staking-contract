@@ -57,6 +57,9 @@ export async function createMint (provider, authority, decimals = 9) {
   return mint;
 }
 
+//Initialize program upon connecting to wallet
+//You can use functions in the api only after calling this function
+//Call this function again whenever you're switching the wallet or connecting your wallet again.
 export const initProgram = (
 	connection: anchor.web3.Connection,
 	wallet: any,
@@ -153,7 +156,6 @@ export async function getStakeInfoAccountPdaByIndex(
 	console.log('stakedInfo', stakeInfoPda.toString())
 	return stakeInfoPda;
 }
-
 
 export async function createState(
     mint: string | PublicKey
@@ -297,70 +299,69 @@ export async function stake(
 }
 
 
-  export async function claim(
-    mint: anchor.web3.PublicKey,
-    user_vault: anchor.web3.PublicKey,
-    pool_index: number,
-		stake_index: number
-  ) {
-      //check if user_vault exists and create
-    let stateSigner = await getStatePda();
-    let poolSigner = await getPoolPda(mint, pool_index);
-    let stakeInfo = await getStakeInfoAccountPdaByIndex( poolSigner, stake_index );
-    let poolVault = await getPoolVault(mint, poolSigner);
+export async function claim(
+  mint: anchor.web3.PublicKey,
+  user_vault: anchor.web3.PublicKey,
+  pool_index: number,
+  stake_index: number
+) {
+    //check if user_vault exists and create
+  let stateSigner = await getStatePda();
+  let poolSigner = await getPoolPda(mint, pool_index);
+  let stakeInfo = await getStakeInfoAccountPdaByIndex( poolSigner, stake_index );
+  let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.claimStake(
-    {
-      accounts: {
-        stakedInfo: stakeInfo,
-        state: stateSigner,
-        pool: poolSigner,
-        authority: program.provider.wallet.publicKey,
-        poolVault: poolVault,
-        userVault: user_vault,
-        ...defaultAccounts
-      }
-    });
-    const user_provider = new anchor.Provider(
-			program.provider.connection,
-			program.provider.wallet,
-			{ commitment: 'confirmed' }
-		);
+  const tx = await program.transaction.claimStake(
+  {
+    accounts: {
+      stakedInfo: stakeInfo,
+      state: stateSigner,
+      pool: poolSigner,
+      authority: program.provider.wallet.publicKey,
+      poolVault: poolVault,
+      userVault: user_vault,
+      ...defaultAccounts
+    }
+  });
+  const user_provider = new anchor.Provider(
+    program.provider.connection,
+    program.provider.wallet,
+    { commitment: 'confirmed' }
+  );
 
-    const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
-  }
+  const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
+}
 
+export async function cancelStake(
+  mint: anchor.web3.PublicKey,
+  user_vault: anchor.web3.PublicKey,
+  pool_index: number,
+  stake_index: number
+) {
 
-  export async function cancelStake(
-    mint: anchor.web3.PublicKey,
-    user_vault: anchor.web3.PublicKey,
-    pool_index: number,
-		stake_index: number
-  ) {
+  let stateSigner = await getStatePda();
+  let poolSigner = await getPoolPda(mint, pool_index);
+  let stakeInfo = await getStakeInfoAccountPdaByIndex( poolSigner, stake_index );
+  let poolVault = await getPoolVault(mint, poolSigner);
 
-    let stateSigner = await getStatePda();
-    let poolSigner = await getPoolPda(mint, pool_index);
-    let stakeInfo = await getStakeInfoAccountPdaByIndex( poolSigner, stake_index );
-    let poolVault = await getPoolVault(mint, poolSigner);
+  const tx = await program.transaction.cancelStake(
+  {
+    accounts: {
+      stakedInfo: stakeInfo,
+      state: stateSigner,
+      pool: poolSigner,
+      authority: program.provider.wallet.publicKey,
+      poolVault: poolVault,
+      userVault: user_vault,
+      ...defaultAccounts
+    }
+  });
 
-    const tx = await program.transaction.cancelStake(
-    {
-      accounts: {
-        stakedInfo: stakeInfo,
-        state: stateSigner,
-        pool: poolSigner,
-        authority: program.provider.wallet.publicKey,
-        poolVault: poolVault,
-        userVault: user_vault,
-        ...defaultAccounts
-      }
-    });
+  const user_provider = new anchor.Provider(
+    program.provider.connection,
+    program.provider.wallet,
+    { commitment: 'confirmed' }
+  );
 
-    const user_provider = new anchor.Provider(
-			program.provider.connection,
-			program.provider.wallet,
-			{ commitment: 'confirmed' }
-		);
-
-    const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
-  }
+  const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
+}

@@ -16,8 +16,11 @@ import {
   getPoolPda,
   getNewStakeInfoAccountPda,
   getLamport,
-  createMint
+  createMint,
+  getPools,
+  getStakes
 } from "./api";
+import { sleep } from "@project-serum/common";
 
 const { SystemProgram, Keypair, Transaction } = anchor.web3
 const assert = require("assert");
@@ -30,7 +33,6 @@ let providerWalletKey = provider.wallet.publicKey;
 const program = anchor.workspace.EnrexStake as Program<EnrexStake>;
 const connection = provider.connection;
 
-
 let mintA:Token,
 stateSigner:web3.PublicKey,
 poolSigner:web3.PublicKey,
@@ -38,6 +40,8 @@ poolVault: web3.PublicKey,
 userVault: web3.PublicKey,
 adminVault: web3.PublicKey,
 stakeInfoPda: web3.PublicKey;
+
+let decimals: number = 9;
 
 describe("enrex_stake", () => {
   // Configure the client to use the local cluster.
@@ -51,7 +55,11 @@ describe("enrex_stake", () => {
     // console.log("Your transaction signature", tx);
 
     mintA = await createMint(provider, providerWalletKey);
+    decimals = (await mintA.getMintInfo()).decimals;
+
     console.log('mintA', mintA.publicKey.toString());
+    console.log('decimals = ', decimals);
+
     userVault = await mintA.createAccount(user.publicKey);
     adminVault = await mintA.createAccount(providerWalletKey);
     await connection.confirmTransaction(await connection.requestAirdrop(user.publicKey, web3.LAMPORTS_PER_SOL));
@@ -80,28 +88,25 @@ describe("enrex_stake", () => {
   });
 
   it("Create Pool", async() => {
-    let apy = 48;
+    let apy1 = 48, apy2 = 60, apy3 = 84;
     let min_stake_amount = 1000;
-    let lock_duration = new BN(30 * 24 * 3600);
+    let lock_duration1 = new BN(10), lock_duration2 = new BN(60 * 24 * 3600), lock_duration3 = new BN(90 * 24 * 3600);
 
     let pools = await program.account.farmPoolAccount.all()
     let pool_index = pools.length;
     console.log('pool_index', pool_index)
 
-    await createPool(
-      apy,
-      min_stake_amount,
-      lock_duration,
-      mintA.publicKey
-    );
+    await createPool( apy1, min_stake_amount, lock_duration1, mintA.publicKey );
+    await createPool( apy2, min_stake_amount, lock_duration2, mintA.publicKey );
+    await createPool( apy3, min_stake_amount, lock_duration3, mintA.publicKey );
 
     poolSigner = await getPoolPda(mintA.publicKey, pool_index);
 
     let poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
 
     pools = await program.account.farmPoolAccount.all()
-    assert(pools.length === pool_index + 1, "Pool count mismatch");
-    assert(poolInfo.lockDuration.eq(lock_duration), "Lock Duation mismatch");
+    assert(pools.length === 3, "Pool count mismatch");
+    assert(poolInfo.lockDuration.eq(lock_duration1), "Lock Duation mismatch");
   });
 
   it("Fund Reward to the Pool", async() => {
@@ -119,14 +124,12 @@ describe("enrex_stake", () => {
       assert(false, "Failed admin validation in funding!");
     } catch {
       initProgram(connection, provider.wallet, program.programId);
-      await fundPool(
-        mintA.publicKey,
-        adminVault,
-        0,
-        amount,
-      );
+      await fundPool(mintA.publicKey, adminVault, 0, amount );
+      await fundPool(mintA.publicKey, adminVault, 1, amount );
+      await fundPool(mintA.publicKey, adminVault, 2, amount );
+
       let poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
-      console.log('reward in the pool', poolInfo.amountReward.toNumber());
+      console.log('reward in the pool', poolInfo.amountReward.toNumber() / (10 ** decimals));
     }
   });
 
@@ -139,35 +142,33 @@ describe("enrex_stake", () => {
 
     try {
       let amount = 100;
-      await stake(
-        mintA.publicKey,
-        userVault,
-        0,
-        amount
-      );
-
+      await stake( mintA.publicKey, userVault, 0, amount );
       assert(false, "Failed checking minimum stake amount!");
     } catch {
       console.log("Can not stake less than the minimum set! Trying more...");
-      let amount = 1001;
-      await stake(
-        mintA.publicKey,
-        userVault,
-        0,
-        amount
-      );
+      let amount1 = 1001, amount2 = 1002, amount3 = 1003;
+      await stake( mintA.publicKey, userVault, 0, amount1 );
+      await stake( mintA.publicKey, userVault, 0, amount2 );
+      await stake( mintA.publicKey, userVault, 0, amount3 );
+
+      await stake( mintA.publicKey, userVault, 1, amount1 );
+      await stake( mintA.publicKey, userVault, 1, amount2 );
+      await stake( mintA.publicKey, userVault, 1, amount3 );
+
+      await stake( mintA.publicKey, userVault, 2, amount1 );
+      await stake( mintA.publicKey, userVault, 2, amount2 );
+      await stake( mintA.publicKey, userVault, 2, amount3 );
 
       let stakeInfoAccount = await program.account.stakedInfo.fetch(stakeInfoPda);
-      console.log('stakeInfoAccount amount', stakeInfoAccount.amount.toNumber());
-      console.log('stakeInfoAccount reward amount', stakeInfoAccount.rewardAmount.toNumber());
+      console.log('stakeInfoAccount amount', stakeInfoAccount.amount.toNumber() / (10 ** decimals));
+      console.log('stakeInfoAccount reward amount', stakeInfoAccount.rewardAmount.toNumber() /  (10 ** decimals));
       console.log('stakeInfoAccount index', stakeInfoAccount.stakeIndex.toString());
 
       poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
-      console.log('pool rewardAmount', poolInfo.amountReward.toString());
-      console.log('pool reserved reward amount', poolInfo.amountRewardReserved.toString());
-      console.log('pool stakedAmount', poolInfo.amountStaked.toString());
-      assert(poolInfo.amountStaked.eq(getLamport(amount)), "Staked amount in poolInfo is wrong!");
-
+      console.log('pool rewardAmount', poolInfo.amountReward.toNumber() / (10 ** decimals));
+      console.log('pool reserved reward amount', poolInfo.amountRewardReserved.toNumber() / (10 ** decimals));
+      console.log('pool stakedAmount', poolInfo.amountStaked.toNumber() / (10 ** decimals));
+      assert(poolInfo.amountStaked.eq(getLamport(amount1 + amount2 + amount3)), "Staked amount in poolInfo is wrong!");
     }
   });
 
@@ -175,41 +176,66 @@ describe("enrex_stake", () => {
     try {
       initProgram(connection, provider.wallet, program.programId);
       console.log('trying to withdraw larger than available')
-      await withdraw(mintA.publicKey, adminVault, 0, 9999);
 
-      assert(false, "Error: withdrew larger than available!");
+      await withdraw(mintA.publicKey, adminVault, 0, 10000);
+
     } catch {
-      console.log('could not withdraw larger than available, trying less...')
-      await withdraw(mintA.publicKey, adminVault, 0, 8000);
-
+      console.log('could not withdraw larger than available, trying less...');
       let poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
-      console.log('rewardAmount after withdrawing', poolInfo.amountReward.toString());
-      console.log('reserved reward amount after withdrawing', poolInfo.amountRewardReserved.toString());
+      console.log('poolInfo reward before withdrawal', poolInfo.amountReward.toNumber() / (10 ** decimals));
+      console.log('poolInfo reserved reward before withdrawal', poolInfo.amountRewardReserved.toNumber() / (10 ** decimals));
+
+      await withdraw(mintA.publicKey, adminVault, 0, 9000);
+
+      poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
+      console.log('rewardAmount after withdrawing', poolInfo.amountReward.toNumber() / (10 ** decimals));
+      console.log('reserved reward amount after withdrawing', poolInfo.amountRewardReserved.toNumber() / (10 ** decimals));
     }
   });
 
   it("Claim Reward from the Pool", async() => {
     initProgram(connection, userWallet, program.programId);
+    await sleep(10000);
+    //should succeed
+    await claim(mintA.publicKey, userVault, 0, 0);
+    console.log('claim succeeded!');
 
     //should fail
-    await claim(mintA.publicKey, userVault, 0, 0);
+    await claim(mintA.publicKey, userVault, 1, 0);
   });
 
   it("Cancel Stake", async() => {
     console.log('before cancelling stake...');
     let poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
     console.log('count stakes = ', poolInfo.countStakes.toNumber());
-    console.log('amount', poolInfo.amountStaked.toNumber());
-    console.log('amountReward', poolInfo.amountReward.toNumber());
-    console.log('amountRewardReserved', poolInfo.amountRewardReserved.toNumber());
+    console.log('amount', poolInfo.amountStaked.toNumber() / (10 ** decimals));
+    console.log('amountReward', poolInfo.amountReward.toNumber() / (10 ** decimals));
+    console.log('amountRewardReserved', poolInfo.amountRewardReserved.toNumber() / (10 ** decimals));
 
-    await cancelStake(mintA.publicKey, userVault, 0, 0);
+    await cancelStake(mintA.publicKey, userVault, 1, 0);
     console.log('after cancelling stake...')
     poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
     console.log('count stakes = ', poolInfo.countStakes.toNumber());
-    console.log('amount', poolInfo.amountStaked.toNumber());
-    console.log('amountReward', poolInfo.amountReward.toNumber());
-    console.log('amountRewardReserved', poolInfo.amountRewardReserved.toNumber());
+    console.log('amount', poolInfo.amountStaked.toNumber() / (10 ** decimals));
+    console.log('amountReward', poolInfo.amountReward.toNumber() / (10 ** decimals));
+    console.log('amountRewardReserved', poolInfo.amountRewardReserved.toNumber() / (10 ** decimals));
+  });
+
+  it("Get all pools", async() => {
+    let pools = await getPools();
+    for(let i = 0; i < pools.length; i++) {
+      console.log('pools[' + i + ']', pools[i]);
+      let stakes = await getStakes(pools[i].publicKey.toString());
+      for(let j = 0; j < stakes.length; j++) {
+        console.log('stakes[' + j + ']', stakes[j]);
+      }
+    }
+  });
+
+  it("Get all stakes", async() => {
+    let stakes = await getStakes();
+    for(let i = 0; i < stakes.length; i++) {
+      console.log('stakes[' + i + ']', stakes[i]);
+    }
   })
 });
-

@@ -95,7 +95,7 @@ pub mod enrex_stake {
         staked_info.pool = pool.key();
         staked_info.authority = _ctx.accounts.authority.key();
         staked_info.stake_index = pool.inc_stakes;
-        staked_info.reward_amount = pool.get_reward_amount(amount);
+        staked_info.reward_amount = pool.get_reward_amount(amount) as u64;
 
         pool.inc_stakes += 1;
         pool.count_stakes += 1;
@@ -253,15 +253,19 @@ pub struct FarmPoolAccount {
 }
 
 impl FarmPoolAccount {
-    pub fn get_reward_amount(&self, amount: u64) -> u64 {
+    pub fn get_reward_amount(&self, amount: u64) -> u128 {
         let apy = self.apy;
-        let lock_duration_in_month = ACC_PRECISION * (&self.lock_duration / (3600 * 24 * 30)) as u64;
-        let percentage = u64::from(lock_duration_in_month)
-            .checked_mul(u64::from(apy))
+        let lock_duration_in_month = u128::from(ACC_PRECISION)
+            .checked_div(3600 * 24 * 30)
+            .unwrap()
+            .checked_mul(self.lock_duration as u128)
+            .unwrap();
+        let percentage = u128::from(lock_duration_in_month)
+            .checked_mul(u128::from(apy))
             .unwrap()
             .checked_div(1200)//12 (months) * 100 (%)
             .unwrap();
-        u64::from(amount)
+        u128::from(amount)
         .checked_mul(percentage)
         .unwrap()
         .checked_div(ACC_PRECISION)

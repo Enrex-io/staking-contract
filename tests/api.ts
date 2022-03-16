@@ -10,7 +10,6 @@ import { Account, Connection, PublicKey, TokenAccountsFilter } from '@solana/web
 // @ts-ignore
 import { TOKEN_PROGRAM_ID, Token } from "@solana/spl-token";
 
-
 const defaultAccounts = {
     tokenProgram: TOKEN_PROGRAM_ID,
     clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
@@ -38,8 +37,8 @@ export async function getPda(
   return pdaKey;
 }
 
-export const getLamport = (amount: number) : anchor.BN => {
-	return new BN(amount * 10 ** 9);
+export const getLamport = (amount: number, decimals: number = 9) : anchor.BN => {
+	return new BN(amount * 10 ** decimals);
 }
 
 export async function createMint (provider, authority, decimals = 9) {
@@ -192,7 +191,7 @@ export async function createPool(
     await program.rpc.createPool(
         pool_index,
         apy,
-        getLamport(min_stake_amount),
+        getLamport(min_stake_amount, 9),
         lock_duration,
         {
             accounts:{
@@ -217,7 +216,7 @@ export async function fundPool(
     let poolSigner = await getPoolPda(mint, pool_index);
     let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.fundPool(getLamport(amount),
+    const tx = await program.transaction.fundPool(getLamport(amount, 9),
     {
       accounts: {
         state: stateSigner,
@@ -248,7 +247,7 @@ export async function withdraw(
     let poolSigner = await getPoolPda(mint, pool_index);
     let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.withdrawPool(getLamport(amount),
+    const tx = await program.transaction.withdrawPool(getLamport(amount, 9),
     {
       accounts: {
         state: stateSigner,
@@ -280,7 +279,7 @@ export async function stake(
     let poolVault = await getPoolVault(mint, poolSigner);
     let stakeInfo = await getNewStakeInfoAccountPda( poolSigner );
 
-    const tx = await program.transaction.stake(getLamport( amount ),
+    const tx = await program.transaction.stake(getLamport( amount, 9 ),
     {
       accounts: {
         stakedInfo: stakeInfo,
@@ -297,7 +296,6 @@ export async function stake(
     const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
     // return await connection.getTransaction(hash);
 }
-
 
 export async function claim(
   mint: anchor.web3.PublicKey,
@@ -364,4 +362,21 @@ export async function cancelStake(
   );
 
   const hash = await user_provider.send(tx, [], { commitment: 'confirmed' });
+}
+
+export async function getPools() {
+  let pools = await program.account.farmPoolAccount.all();
+  return pools;
+}
+
+export async function getStakes(pool_pda: string = null, user_vault: string = null) {
+  let stakes = await program.account.stakedInfo.all();
+  return stakes.filter(function(el) {
+    let result = true;
+    if(pool_pda !== null)
+      result = result && (el.account.pool.toString() == pool_pda)
+    if(user_vault !== null)
+      result = result && (el.account.authority.toString() == user_vault)
+    return result;
+  })
 }

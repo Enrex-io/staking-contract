@@ -10,8 +10,11 @@
     3. Install [⚓ Anchor](https://project-serum.github.io/anchor/getting-started/installation.html#install-rust)
        ```cargo install --git https://github.com/project-serum/anchor --tag v0.22.0 anchor-cli --locked```
 
-1. Restart terminals (or create new terminal window via CMD+N)
+2. Restart terminals (or create new terminal window via CMD+N)
 
+3. Install packages:
+
+   ```yarn install```
 <br>
 
 ## Configure localnet testing
@@ -26,7 +29,6 @@
    solana-test-validator
    ```
    ![init-validator](./.github/init-validator.png)
-
 
 1. Build and deploy programs (smart contracts) to determine their addresses:
 

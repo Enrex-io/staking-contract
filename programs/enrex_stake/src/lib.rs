@@ -189,17 +189,27 @@ pub struct CreateState<'info> {
         space = 8 + size_of::<StateAccount>()
     )]
     pub state: Account<'info, StateAccount>,
+
+    ///pool's token mint
     pub token_mint: Account<'info, Mint>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
+
     pub system_program: Program<'info, System>,
+
     pub clock: Sysvar<'info, Clock>,
 }
 
 #[account()]
 pub struct StateAccount {
+    ///state creator
     pub authority: Pubkey,
+
+    ///token mint will be same through all pools
     pub token_mint: Pubkey,
+
+    ///just as additional info
     pub start_time: i64,
 }
 
@@ -209,14 +219,17 @@ pub struct CreateFarmPool<'info> {
     #[account(
         init,
         seeds = [state.token_mint.as_ref(), &[pool_index]],
-        // constraint = pool_index < 3,
         bump,
         payer = authority,
         space = 8 + size_of::<FarmPoolAccount>()
     )]
     pub pool: Account<'info, FarmPoolAccount>,
+
+    ///only state creator can create a pool
     #[account(mut, seeds = [b"state".as_ref()], bump, has_one = authority)]
     pub state: Account<'info, StateAccount>,
+
+    ///token account to receive and transfer stakes and rewards
     #[account(
         init,
         token::mint = mint,
@@ -226,33 +239,58 @@ pub struct CreateFarmPool<'info> {
         payer = authority
     )]
     pub vault: Account<'info, TokenAccount>,
+
+    ///validating if it is a correct mint that are initiated by the state creator
     #[account(constraint = state.token_mint == mint.key())]
     pub mint: Account<'info, Mint>,
+
+    ///pool creator
     #[account(mut)]
     pub authority: Signer<'info>,
+
     pub system_program: Program<'info, System>,
+
     #[account(constraint = token_program.key == &token::ID)]
     pub token_program: Program<'info, Token>,
+
     pub clock: Sysvar<'info, Clock>,
+
     pub rent: Sysvar<'info, Rent>,
 }
 
 #[account()]
 pub struct FarmPoolAccount {
+    ///farm creator
     pub authority: Pubkey,
+
     pub amount_staked: u64,
+
     pub amount_reward: u64,
+
     pub amount_reward_reserved: u64,
+
     pub min_stake_amount: u64,
+
     pub vault: Pubkey,
-    pub count_stakes: u64,//count of active stakes
-    pub inc_stakes: u64,//only increase
+
+    ///count of active stakes
+    pub count_stakes: u64,
+
+    //only increase - it is used to derive unique stake info account(A user creates a new stake info account whenever he stakes)
+    pub inc_stakes: u64,
+
     pub lock_duration: i64,
+
+    ///apy as percentage value
     pub apy: u8,
+
+    ///it is used as a pool_index when deriving a pool's pda
     pub index: u8
 }
 
 impl FarmPoolAccount {
+
+    ///calculate reward amount from the stake amount
     pub fn get_reward_amount(&self, amount: u64) -> u128 {
         let apy = self.apy;
         let lock_duration_in_month = u128::from(ACC_PRECISION)
@@ -275,19 +313,23 @@ impl FarmPoolAccount {
 
 #[derive(Accounts)]
 pub struct FundPool<'info> {
+    ///only admin can fund the pool
     #[account(mut,
         seeds = [b"state".as_ref()],
         bump,
-        has_one = authority)//only admin can fund the pool
+        has_one = authority)
     ]
     pub state: Account<'info, StateAccount>,
+
     #[account(mut,
         seeds = [state.token_mint.as_ref(), &[pool.index]],
         bump,
     )]
     pub pool: Account<'info, FarmPoolAccount>,
+
     #[account(mut)]
     pub authority: Signer<'info>,
+
     #[account(mut,
         seeds = [
             state.token_mint.as_ref(),
@@ -295,25 +337,39 @@ pub struct FundPool<'info> {
         bump
     )]
     pub pool_vault: Account<'info, TokenAccount>,
+
+    ///funder's token account should be admin's
     #[account(mut, constraint = user_vault.owner == authority.key())]
     pub user_vault: Account<'info, TokenAccount>,
+
     #[account(constraint = token_program.key == &token::ID)]
     pub token_program: Program<'info, Token>
 }
 
 #[account()]
 pub struct StakedInfo {
+    ///staked pool
     pub pool: Pubkey,
+
+    ///staker
     pub authority: Pubkey,
+
+    ///stake amount
     pub amount: u64,
+
+    ///reward amount
     pub reward_amount: u64,
+
     pub staked_time: i64,
+
+    ///index of the StakedInfo account. Pool account increases inc_stakes whenever there is a stake, and use it for deriving StakedInfo pda
     pub stake_index: u64
 }
 
 
 #[derive(Accounts)]
 pub struct Stake<'info> {
+
     #[account(
         init,
         seeds= [
@@ -329,6 +385,7 @@ pub struct Stake<'info> {
 
     #[account(mut, seeds = [b"state".as_ref()], bump)]
     pub state: Account<'info, StateAccount>,
+
     #[account(mut,
         seeds = [state.token_mint.as_ref(), &[pool.index]],
         bump)]
@@ -336,21 +393,26 @@ pub struct Stake<'info> {
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
     #[account(mut,
         seeds = [state.token_mint.as_ref(), pool.key().as_ref()],
         bump
     )]
     pub pool_vault: Account<'info, TokenAccount>,
+
     #[account(mut, constraint = user_vault.owner == authority.key())]
     pub user_vault: Account<'info, TokenAccount>,
+
     #[account(constraint = token_program.key == &token::ID)]
     pub token_program: Program<'info, Token>,
+
     pub clock: Sysvar<'info, Clock>,
 
     pub system_program: Program<'info, System>,
 
 }
 
+///This context is used in unstaking and cancelling
 #[derive(Accounts)]
 pub struct Unstake<'info> {
     #[account(mut,
@@ -368,6 +430,7 @@ pub struct Unstake<'info> {
 
     #[account(mut, seeds = [b"state".as_ref()], bump)]
     pub state: Account<'info, StateAccount>,
+
     #[account(mut,
         seeds = [state.token_mint.as_ref(), &[pool.index]],
         bump)]
@@ -375,16 +438,21 @@ pub struct Unstake<'info> {
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
     #[account(mut,
         seeds = [state.token_mint.as_ref(), pool.key().as_ref()],
         bump
     )]
     pub pool_vault: Account<'info, TokenAccount>,
+
     #[account(mut, constraint = user_vault.owner == authority.key())]
     pub user_vault: Account<'info, TokenAccount>,
+
     #[account(constraint = token_program.key == &token::ID)]
     pub token_program: Program<'info, Token>,
+
     pub clock: Sysvar<'info, Clock>,
+
     pub system_program: Program<'info, System>,
 }
 

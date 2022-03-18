@@ -6,7 +6,7 @@ use error::*;
 pub mod constants;
 use constants::*;
 
-declare_id!("GCjWF2JqqcfbZTF1zbwxMi7ExdzWwt9PUs57v3mtE1f2");
+declare_id!("9ZmxLBeqLtxzJ2TRg5YdniyCcVuauB3aL3oTVBBK4Z4K");
 
 #[program]
 pub mod enrex_stake {

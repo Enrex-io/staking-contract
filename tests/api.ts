@@ -140,7 +140,6 @@ export async function getStakeInfoAccountPdaByIndex(
 ) {
 	let poolInfo = await program.account.farmPoolAccount.fetch(pool_pda);
 
-
 	const [stakeInfoPda] = await anchor.web3.PublicKey.findProgramAddress(
 		[
 			STAKE_INFO_TAG,

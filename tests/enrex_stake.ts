@@ -25,7 +25,6 @@ import { sleep } from "@project-serum/common";
 const { SystemProgram, Keypair, Transaction } = anchor.web3
 const assert = require("assert");
 
-const utf8 = anchor.utils.bytes.utf8;
 anchor.setProvider(anchor.Provider.env());
 const provider = anchor.getProvider();
 let providerWalletKey = provider.wallet.publicKey;

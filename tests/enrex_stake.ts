@@ -89,12 +89,13 @@ describe("enrex_stake", () => {
   it("Create Pool", async() => {
     let apy1 = 48, apy2 = 60, apy3 = 84;
     let min_stake_amount = 1000;
-    let lock_duration1 = new BN(10), lock_duration2 = new BN(60 * 24 * 3600), lock_duration3 = new BN(90 * 24 * 3600);
+    let lock_duration = new BN(30 * 24 * 3600), lock_duration1 = new BN(10), lock_duration2 = new BN(60 * 24 * 3600), lock_duration3 = new BN(90 * 24 * 3600);
 
     let pools = await program.account.farmPoolAccount.all()
     let pool_index = pools.length;
-    console.log('pool_index', pool_index)
+    console.log('pool_index', pool_index);
 
+    await createPool( apy1, min_stake_amount, lock_duration, mintA.publicKey );
     await createPool( apy1, min_stake_amount, lock_duration1, mintA.publicKey );
     await createPool( apy2, min_stake_amount, lock_duration2, mintA.publicKey );
     await createPool( apy3, min_stake_amount, lock_duration3, mintA.publicKey );
@@ -109,7 +110,7 @@ describe("enrex_stake", () => {
   });
 
   it("Fund Reward to the Pool", async() => {
-    let amount = 10000;
+    let amount = 100;
     try {
       console.log('trying malicious user funding');
 
@@ -142,33 +143,40 @@ describe("enrex_stake", () => {
     try {
       let amount = 100;
       await stake( mintA.publicKey, userVault, 0, amount );
-      assert(false, "Failed checking minimum stake amount!");
     } catch {
-      console.log("Can not stake less than the minimum set! Trying more...");
-      let amount1 = 1001, amount2 = 1002, amount3 = 1003;
-      await stake( mintA.publicKey, userVault, 0, amount1 );
-      await stake( mintA.publicKey, userVault, 0, amount2 );
-      await stake( mintA.publicKey, userVault, 0, amount3 );
-
-      await stake( mintA.publicKey, userVault, 1, amount1 );
-      await stake( mintA.publicKey, userVault, 1, amount2 );
-      await stake( mintA.publicKey, userVault, 1, amount3 );
-
-      await stake( mintA.publicKey, userVault, 2, amount1 );
-      await stake( mintA.publicKey, userVault, 2, amount2 );
-      await stake( mintA.publicKey, userVault, 2, amount3 );
-
-      let stakeInfoAccount = await program.account.stakedInfo.fetch(stakeInfoPda);
-      console.log('stakeInfoAccount amount', stakeInfoAccount.amount.toNumber() / (10 ** decimals));
-      console.log('stakeInfoAccount reward amount', stakeInfoAccount.rewardAmount.toNumber() /  (10 ** decimals));
-      console.log('stakeInfoAccount index', stakeInfoAccount.stakeIndex.toString());
-
-      poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
-      console.log('pool rewardAmount', poolInfo.amountReward.toNumber() / (10 ** decimals));
-      console.log('pool reserved reward amount', poolInfo.amountRewardReserved.toNumber() / (10 ** decimals));
-      console.log('pool stakedAmount', poolInfo.amountStaked.toNumber() / (10 ** decimals));
-      assert(poolInfo.amountStaked.eq(getLamport(amount1 + amount2 + amount3)), "Staked amount in poolInfo is wrong!");
+      console.log('Can not stake less than minimum');
     }
+
+    try {
+      let amount = 2537;
+      await stake( mintA.publicKey, userVault, 0, amount );
+    } catch {
+      console.log('Can not stake more than available');
+    }
+
+    let amount1 = 2536, amount2 = 1002, amount3 = 1003;
+    await stake( mintA.publicKey, userVault, 0, amount1 );
+    await stake( mintA.publicKey, userVault, 0, amount2 );
+    await stake( mintA.publicKey, userVault, 0, amount3 );
+
+    await stake( mintA.publicKey, userVault, 1, amount1 );
+    await stake( mintA.publicKey, userVault, 1, amount2 );
+    await stake( mintA.publicKey, userVault, 1, amount3 );
+
+    await stake( mintA.publicKey, userVault, 2, amount1 );
+    await stake( mintA.publicKey, userVault, 2, amount2 );
+    await stake( mintA.publicKey, userVault, 2, amount3 );
+
+    let stakeInfoAccount = await program.account.stakedInfo.fetch(stakeInfoPda);
+    console.log('stakeInfoAccount amount', stakeInfoAccount.amount.toNumber() / (10 ** decimals));
+    console.log('stakeInfoAccount reward amount', stakeInfoAccount.rewardAmount.toNumber() /  (10 ** decimals));
+    console.log('stakeInfoAccount index', stakeInfoAccount.stakeIndex.toString());
+
+    poolInfo = await program.account.farmPoolAccount.fetch(poolSigner);
+    console.log('pool rewardAmount', poolInfo.amountReward.toNumber() / (10 ** decimals));
+    console.log('pool reserved reward amount', poolInfo.amountRewardReserved.toNumber() / (10 ** decimals));
+    console.log('pool stakedAmount', poolInfo.amountStaked.toNumber() / (10 ** decimals));
+    assert(poolInfo.amountStaked.eq(getLamport(amount1 + amount2 + amount3)), "Staked amount in poolInfo is wrong!");
   });
 
   it("Withdraw Reward from the Pool", async() => {

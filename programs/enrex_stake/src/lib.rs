@@ -89,17 +89,23 @@ pub mod enrex_stake {
             ErrorMsg::BelowMinStakeAmount
         );
 
+        let reward_amount = pool.get_reward_amount(amount) as u64;
+        let reward_amount_reserved = pool.amount_reward_reserved + reward_amount;
+        require!(reward_amount_reserved <= pool.amount_reward,
+            ErrorMsg::OverflowReservedReward
+        );
+
         let staked_info = &mut _ctx.accounts.staked_info;
         staked_info.amount = amount;
         staked_info.staked_time = _ctx.accounts.clock.unix_timestamp;
         staked_info.pool = pool.key();
         staked_info.authority = _ctx.accounts.authority.key();
         staked_info.stake_index = pool.inc_stakes;
-        staked_info.reward_amount = pool.get_reward_amount(amount) as u64;
+        staked_info.reward_amount = reward_amount;
 
         pool.inc_stakes += 1;
         pool.count_stakes += 1;
-        pool.amount_reward_reserved += staked_info.reward_amount;
+        pool.amount_reward_reserved = reward_amount_reserved;
         pool.amount_staked += amount;
 
         let cpi_accounts = Transfer {
@@ -293,15 +299,15 @@ impl FarmPoolAccount {
     ///calculate reward amount from the stake amount
     pub fn get_reward_amount(&self, amount: u64) -> u128 {
         let apy = self.apy;
-        let lock_duration_in_month = u128::from(ACC_PRECISION)
-            .checked_div(3600 * 24 * 30)
+        let lock_duration_in_days = u128::from(ACC_PRECISION)
+            .checked_div(3600 * 24)
             .unwrap()
             .checked_mul(self.lock_duration as u128)
             .unwrap();
-        let percentage = u128::from(lock_duration_in_month)
+        let percentage = u128::from(lock_duration_in_days)
             .checked_mul(u128::from(apy))
             .unwrap()
-            .checked_div(1200)//12 (months) * 100 (%)
+            .checked_div(36525)// 365.25 (days) * 100 (%)
             .unwrap();
         u128::from(amount)
         .checked_mul(percentage)

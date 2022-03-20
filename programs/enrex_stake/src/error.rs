@@ -7,4 +7,6 @@ pub enum ErrorMsg {
     UnderLocked,
     #[msg("Staking amount shouldn't be less than the minimum value")]
     BelowMinStakeAmount,
+    #[msg("Overflow reserved reward")]
+    OverflowReservedReward
 }

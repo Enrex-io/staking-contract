@@ -147,14 +147,14 @@ describe("enrex_stake", () => {
       console.log('Can not stake less than minimum');
     }
 
-    try {
-      let amount = 2537;
-      await stake( mintA.publicKey, userVault, 0, amount );
-    } catch {
-      console.log('Can not stake more than available');
-    }
+    // try {
+    //   let amount = 10000;
+    //   await stake( mintA.publicKey, userVault, 0, amount );
+    // } catch {
+    //   console.log('Can not stake more than available');
+    // }
 
-    let amount1 = 2536, amount2 = 1002, amount3 = 1003;
+    let amount1 = 2500, amount2 = 1002, amount3 = 1003;
     await stake( mintA.publicKey, userVault, 0, amount1 );
     await stake( mintA.publicKey, userVault, 0, amount2 );
     await stake( mintA.publicKey, userVault, 0, amount3 );

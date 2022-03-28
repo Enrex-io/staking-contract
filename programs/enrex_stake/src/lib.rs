@@ -42,7 +42,7 @@ pub mod enrex_stake {
 
     pub fn fund_pool(_ctx: Context<FundPool>, amount: u64) -> Result<()> {
         let pool = &mut _ctx.accounts.pool;
-        pool.amount_reward += amount;
+        pool.amount_reward = pool.amount_reward.checked_add(amount).unwrap();
         let cpi_accounts = Transfer {
             from: _ctx.accounts.user_vault.to_account_info(),
             to: _ctx.accounts.pool_vault.to_account_info(),
@@ -90,7 +90,7 @@ pub mod enrex_stake {
         );
 
         let reward_amount = pool.get_reward_amount(amount) as u64;
-        let reward_amount_reserved = pool.amount_reward_reserved + reward_amount;
+        let reward_amount_reserved = pool.amount_reward_reserved.checked_add(reward_amount).unwrap();
         require!(reward_amount_reserved <= pool.amount_reward,
             ErrorMsg::OverflowReservedReward
         );
@@ -103,10 +103,10 @@ pub mod enrex_stake {
         staked_info.stake_index = pool.inc_stakes;
         staked_info.reward_amount = reward_amount;
 
-        pool.inc_stakes += 1;
-        pool.count_stakes += 1;
+        pool.inc_stakes = pool.inc_stakes.checked_add(1).unwrap();
+        pool.count_stakes = pool.count_stakes.checked_add(1).unwrap();
         pool.amount_reward_reserved = reward_amount_reserved;
-        pool.amount_staked += amount;
+        pool.amount_staked = pool.amount_reward.checked_add(amount).unwrap();
 
         let cpi_accounts = Transfer {
             from: _ctx.accounts.user_vault.to_account_info(),
@@ -160,7 +160,7 @@ pub mod enrex_stake {
             ErrorMsg::UnderLocked
         );
 
-        let amount = staked_info.amount + staked_info.reward_amount;
+        let amount = staked_info.amount.checked_add(staked_info.reward_amount).unwrap();
 
         let cpi_accounts = Transfer {
             from: _ctx.accounts.pool_vault.to_account_info(),
@@ -176,10 +176,10 @@ pub mod enrex_stake {
         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
         token::transfer(cpi_ctx, amount)?;
 
-        pool.count_stakes -= 1;
-        pool.amount_reward -= staked_info.reward_amount;
-        pool.amount_reward_reserved -= staked_info.reward_amount;
-        pool.amount_staked -= staked_info.amount;
+        pool.count_stakes = pool.count_stakes.checked_sub(1).unwrap();
+        pool.amount_reward = pool.amount_reward.checked_sub(staked_info.reward_amount).unwrap();
+        pool.amount_reward_reserved = pool.amount_reward_reserved.checked_sub( staked_info.reward_amount).unwrap();
+        pool.amount_staked = pool.amount_staked.checked_sub( staked_info.amount).unwrap();
 
         Ok(())
     }
@@ -202,6 +202,9 @@ pub struct CreateState<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
+    #[account(
+        constraint = system_program.key() == System::id()
+    )]
     pub system_program: Program<'info, System>,
 
     pub clock: Sysvar<'info, Clock>,
@@ -254,6 +257,9 @@ pub struct CreateFarmPool<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
+    #[account(
+        constraint = system_program.key() == System::id()
+    )]
     pub system_program: Program<'info, System>,
 
     #[account(constraint = token_program.key == &token::ID)]
@@ -414,6 +420,9 @@ pub struct Stake<'info> {
 
     pub clock: Sysvar<'info, Clock>,
 
+    #[account(
+        constraint = system_program.key() == System::id()
+    )]
     pub system_program: Program<'info, System>,
 
 }
@@ -459,6 +468,9 @@ pub struct Unstake<'info> {
 
     pub clock: Sysvar<'info, Clock>,
 
+    #[account(
+        constraint = system_program.key() == System::id()
+    )]
     pub system_program: Program<'info, System>,
 }
 

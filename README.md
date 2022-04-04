@@ -7,6 +7,11 @@ Enrex staking cotract has been audited by [QuillAudits](https://github.com/Quill
 
 [Audit report can be found under this link](https://github.com/Enrex-io/staking-contract/blob/main/Audit/Enrex%20Staking%20Smart%20Contract%20Audit%20Report%20-%20QuillAudits.pdf)
 
+
+Smart contract on chain https://solscan.io/account/2BkjfP3SzHe1sfBiYS61A6cffJtgJcTy5qaRGbhQCY22
+
+Program ID: 2BkjfP3SzHe1sfBiYS61A6cffJtgJcTy5qaRGbhQCY22
+
 <br>
 
 

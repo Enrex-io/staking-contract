@@ -3,9 +3,13 @@
 
 ## Audit report
 
-Enrex stakinng countract has been audited by [QuillAudits](https://github.com/Quillhash/Audit_Reports/blob/master/Enrex%20Staking%20Smart%20Contract%20Audit%20Report%20-%20QuillAudits.pdf)
-[Audit report can be found under this link](https://github.com/Quillhash/Audit_Reports/blob/master/Enrex%20Staking%20Smart%20Contract%20Audit%20Report%20-%20QuillAudits.pdf)
+Enrex staking cotract has been audited by [QuillAudits](https://github.com/Quillhash/Audit_Reports/blob/master/Enrex%20Staking%20Smart%20Contract%20Audit%20Report%20-%20QuillAudits.pdf)
+
+[Audit report can be found under this link](https://github.com/Enrex-io/staking-contract/blob/main/Audit/Enrex%20Staking%20Smart%20Contract%20Audit%20Report%20-%20QuillAudits.pdf)
+
 <br>
+
+
 
 ## Prerequisites
 

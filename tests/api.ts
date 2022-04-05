@@ -37,11 +37,11 @@ export async function getPda(
   return pdaKey;
 }
 
-export const getLamport = (amount: number, decimals: number = 9) : anchor.BN => {
+export const getLamport = (amount: number, decimals: number = 3) : anchor.BN => {
 	return new BN(amount * 10 ** decimals);
 }
 
-export async function createMint (provider, authority, decimals = 9) {
+export async function createMint (provider, authority, decimals = 3) {
   if (authority === undefined) {
     authority = provider.wallet.publicKey;
   }
@@ -190,7 +190,7 @@ export async function createPool(
     await program.rpc.createPool(
         pool_index,
         apy,
-        getLamport(min_stake_amount, 9),
+        getLamport(min_stake_amount, 3),
         lock_duration,
         {
             accounts:{
@@ -215,7 +215,7 @@ export async function fundPool(
     let poolSigner = await getPoolPda(mint, pool_index);
     let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.fundPool(getLamport(amount, 9),
+    const tx = await program.transaction.fundPool(getLamport(amount, 3),
     {
       accounts: {
         state: stateSigner,
@@ -246,7 +246,7 @@ export async function withdraw(
     let poolSigner = await getPoolPda(mint, pool_index);
     let poolVault = await getPoolVault(mint, poolSigner);
 
-    const tx = await program.transaction.withdrawPool(getLamport(amount, 9),
+    const tx = await program.transaction.withdrawPool(getLamport(amount, 3),
     {
       accounts: {
         state: stateSigner,
@@ -278,7 +278,7 @@ export async function stake(
     let poolVault = await getPoolVault(mint, poolSigner);
     let stakeInfo = await getNewStakeInfoAccountPda( poolSigner );
 
-    const tx = await program.transaction.stake(getLamport( amount, 9 ),
+    const tx = await program.transaction.stake(getLamport( amount, 3 ),
     {
       accounts: {
         stakedInfo: stakeInfo,

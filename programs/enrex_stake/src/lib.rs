@@ -106,7 +106,7 @@ pub mod enrex_stake {
         pool.inc_stakes = pool.inc_stakes.checked_add(1).unwrap();
         pool.count_stakes = pool.count_stakes.checked_add(1).unwrap();
         pool.amount_reward_reserved = reward_amount_reserved;
-        pool.amount_staked = pool.amount_reward.checked_add(amount).unwrap();
+        pool.amount_staked = pool.amount_staked.checked_add(amount).unwrap();
 
         let cpi_accounts = Transfer {
             from: _ctx.accounts.user_vault.to_account_info(),
@@ -305,18 +305,25 @@ impl FarmPoolAccount {
     ///calculate reward amount from the stake amount
     pub fn get_reward_amount(&self, amount: u64) -> u128 {
         let apy = self.apy;
-        let lock_duration_in_days = u128::from(ACC_PRECISION)
-            .checked_div(3600 * 24)
-            .unwrap()
-            .checked_mul(self.lock_duration as u128)
-            .unwrap();
-        let percentage = u128::from(lock_duration_in_days)
-            .checked_mul(u128::from(apy))
-            .unwrap()
-            .checked_div(36525)// 365.25 (days) * 100 (%)
-            .unwrap();
+        // let lock_duration_in_days = u128::from(ACC_PRECISION)
+        //     .checked_mul(self.lock_duration as u128)
+        //     .unwrap()
+        //     .checked_div(3600 * 24)
+        //     .unwrap();
+        // let percentage = u128::from(lock_duration_in_days)
+        //     .checked_mul(u128::from(apy))
+        //     .unwrap()
+        //     .checked_div(36525)// 365.25 (days) * 100 (%)
+        //     .unwrap();
+
         u128::from(amount)
-        .checked_mul(percentage)
+        .checked_mul(u128::from(apy))
+        .unwrap()
+        .checked_mul(self.lock_duration as u128)
+        .unwrap()
+        .checked_mul(u128::from(ACC_PRECISION))
+        .unwrap()
+        .checked_div(36525 * 3600 * 24)// 365.25 (days) * 100 (%)
         .unwrap()
         .checked_div(ACC_PRECISION)
         .unwrap()

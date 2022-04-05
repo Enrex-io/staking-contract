@@ -1,4 +1,22 @@
-# enrex-staking-contract
+# Enrex Staking Contract
+
+
+## Audit report
+
+Enrex staking cotract has been audited by [QuillAudits](https://github.com/Quillhash/Audit_Reports/blob/master/Enrex%20Staking%20Smart%20Contract%20Audit%20Report%20-%20QuillAudits.pdf)
+
+[Audit report can be found under this link](https://github.com/Enrex-io/staking-contract/blob/main/Audit/Enrex%20Staking%20Smart%20Contract%20Audit%20Report%20-%20QuillAudits.pdf)
+
+
+Smart contract on chain https://solscan.io/account/2BkjfP3SzHe1sfBiYS61A6cffJtgJcTy5qaRGbhQCY22
+
+Program ID: 2BkjfP3SzHe1sfBiYS61A6cffJtgJcTy5qaRGbhQCY22
+
+<br>
+
+
+
+## Prerequisites
 
 1. Install Solana development environment
     1. Install [Rust](https://doc.rust-lang.org/cargo/getting-started/installation.html)
